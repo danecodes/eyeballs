@@ -119,7 +119,8 @@ export class EyeballsError extends Error {
 
 // --- Storage ---
 
-const EYEBALLS_DIR = join(homedir(), '.eyeballs');
+// Overridable via EYEBALLS_HOME env var for testing
+const EYEBALLS_DIR = process.env.EYEBALLS_HOME || join(homedir(), '.eyeballs');
 const SCREENSHOTS_DIR = join(EYEBALLS_DIR, 'screenshots');
 const WATCHES_FILE = join(EYEBALLS_DIR, 'watches.json');
 
@@ -197,14 +198,14 @@ async function getBrowser(): Promise<Browser> {
 
 export async function shutdownBrowser(): Promise<void> {
   if (browser) {
-    await browser.close().catch(() => {});
+    try { await browser.close(); } catch {}
     browser = null;
   }
 }
 
 // Cleanup on exit
 process.on('exit', () => {
-  browser?.close().catch(() => {});
+  try { browser?.close(); } catch {}
 });
 process.on('SIGINT', async () => {
   await shutdownBrowser();
