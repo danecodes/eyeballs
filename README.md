@@ -7,7 +7,7 @@ Ships as both a **CLI tool** and an **MCP server** in one package.
 ## Install
 
 ```bash
-npm install -g eyeballs
+npm install -g eyeballs-cli
 ```
 
 This installs Chromium automatically (~400MB on first install).
@@ -85,13 +85,24 @@ check_url({ url: "https://example.com", threshold: 5, region: { x: 0, y: 100, wi
 
 First call captures a baseline. Subsequent calls diff against it and report the percentage of pixels that changed. Use `reset_baseline: true` to accept the current state.
 
+## Overlay Handling
+
+eyeballs automatically dismisses cookie consent banners, chat widgets, and other overlays before taking screenshots. Three layers:
+
+1. **CSS injection** hides common banners (OneTrust, Cookiebot, Intercom, Drift, Zendesk, etc.) before the page loads
+2. **autoconsent** (via DuckDuckGo's database) clicks through 100+ known consent platforms
+3. **Brute-force dismiss** finds and clicks remaining "Agree"/"Accept" buttons and removes overlay elements
+
+No configuration needed. Works on most sites out of the box.
+
 ## How It Works
 
 - **Screenshots** via Playwright (headless Chromium)
 - **Diffing** via pixelmatch (deterministic pixel comparison, no AI needed)
+- **Overlay removal** via CSS injection + autoconsent + button clicking
 - **Storage** at `~/.eyeballs/` (baselines + screenshots as PNG files)
-- **Threshold** default 5% — configurable per watch to reduce noise from dynamic content
-- **Region crop** — monitor just the part of the page you care about
+- **Threshold** default 5%, configurable per watch to reduce noise from dynamic content
+- **Region crop** to monitor just the part of the page you care about
 
 ## Requirements
 

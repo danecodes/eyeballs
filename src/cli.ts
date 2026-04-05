@@ -13,15 +13,19 @@ import {
   shutdownBrowser,
   EyeballsError,
 } from './core.js';
-import { writeFileSync } from 'fs';
-import { join } from 'path';
+import { writeFileSync, readFileSync } from 'fs';
+import { join, dirname } from 'path';
+import { fileURLToPath } from 'url';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const pkg = JSON.parse(readFileSync(join(__dirname, '..', 'package.json'), 'utf-8'));
 
 const program = new Command();
 
 program
   .name('eyeballs')
   .description('Visual monitoring for AI agents and humans')
-  .version('0.1.0');
+  .version(pkg.version);
 
 // --- screenshot ---
 

@@ -1,10 +1,42 @@
 import { chromium, type Browser, type Page } from 'playwright';
+import { handleCookieConsent } from 'playwright-autoconsent';
 import pixelmatch from 'pixelmatch';
 import { PNG, type PNGWithMetadata } from 'pngjs';
 import { readFileSync, writeFileSync, mkdirSync, existsSync, unlinkSync, readdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
 import { randomUUID } from 'crypto';
+
+// CSS to hide common cookie/consent banners before JS loads
+const CONSENT_HIDE_CSS = `
+  #onetrust-consent-sdk, #onetrust-banner-sdk,
+  #CookieConsentContainer, #cookie-banner, #cookie-consent, #cookie-notice,
+  .cc-window, .cc-banner, .cc-overlay,
+  .cookie-banner, .cookie-consent, .cookie-notice,
+  .qc-cmp2-container, .qc-cmp-showing,
+  #truste-consent-track, #trustarc-banner-overlay,
+  .osano-cm-window, .evidon-consent-button,
+  [class*="cookieConsent"], [class*="cookie-consent"], [class*="cookie-banner"],
+  [id*="cookie-banner"], [id*="cookieconsent"],
+  [aria-label*="cookie" i], [aria-label*="consent" i],
+  .gdpr-banner, .privacy-banner,
+  .onetrust-pc-dark-filter, [class*="cookie-overlay"], [class*="consent-overlay"],
+  /* Chat widgets */
+  #intercom-container, #intercom-frame, .intercom-lightweight-app,
+  #hubspot-messages-iframe-container, #hs-eu-cookie-confirmation,
+  #drift-widget, #drift-frame-controller, #drift-frame-chat,
+  .crisp-client, #crisp-chatbox,
+  #tidio-chat, #tidio-chat-iframe,
+  .fb_dialog, .fb-customerchat,
+  #launcher, iframe[title="chat widget"],
+  [class*="zendesk"], #webWidget, #Smallchat,
+  .tawk-min-container, #tawk-tooltip-container,
+  [id*="livechat"], [class*="livechat"],
+  [id*="chat-widget"], [class*="chat-widget"] {
+    display: none !important;
+    visibility: hidden !important;
+  }
+`;
 
 // --- Types ---
 
@@ -206,6 +238,14 @@ export async function capture(
 
   const b = await getBrowser();
   const context = await b.newContext({ viewport });
+
+  // Layer 1: CSS injection to hide consent banners before JS loads
+  await context.addInitScript((css: string) => {
+    const style = document.createElement('style');
+    style.textContent = css;
+    (document.head || document.documentElement).appendChild(style);
+  }, CONSENT_HIDE_CSS);
+
   const page: Page = await context.newPage();
 
   const start = Date.now();
@@ -221,6 +261,38 @@ export async function capture(
         throw new EyeballsError('LOAD_FAILED', `Page returned ${status}`);
       }
     }
+
+    // Layer 2: autoconsent clicks through any remaining cookie dialogs
+    try {
+      await handleCookieConsent(page);
+    } catch {
+      // Not all pages have consent popups
+    }
+
+    // Layer 3: brute-force dismiss any remaining modals/overlays
+    await page.evaluate(() => {
+      // Click common "agree/accept/dismiss" buttons
+      const buttonTexts = ['agree', 'accept', 'ok', 'i agree', 'got it', 'continue', 'dismiss', 'close'];
+      const buttons = document.querySelectorAll('button, a[role="button"], [class*="btn"], [class*="button"]');
+      for (const btn of buttons) {
+        const text = (btn as HTMLElement).textContent?.trim().toLowerCase() || '';
+        if (buttonTexts.includes(text)) {
+          (btn as HTMLElement).click();
+          break;
+        }
+      }
+      // Remove any remaining overlays/backdrops
+      const overlays = document.querySelectorAll('[class*="overlay"], [class*="backdrop"], [class*="modal-bg"]');
+      for (const el of overlays) {
+        const style = window.getComputedStyle(el);
+        if (style.position === 'fixed' || style.position === 'absolute') {
+          (el as HTMLElement).style.display = 'none';
+        }
+      }
+      // Restore scroll
+      document.body.style.overflow = 'auto';
+      document.documentElement.style.overflow = 'auto';
+    });
 
     // Wait for paint to settle
     await page.waitForTimeout(2000);
