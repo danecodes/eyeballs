@@ -1,11 +1,11 @@
 {
-  "name": "eyeballs",
+  "name": "eyeballs-cli",
   "version": "0.1.0",
   "description": "Visual monitoring for AI agents and humans. CLI + MCP server.",
   "type": "module",
   "bin": {
-    "eyeballs": "./dist/cli.js",
-    "eyeballs-mcp": "./dist/mcp.js"
+    "eyeballs": "dist/cli.js",
+    "eyeballs-mcp": "dist/mcp.js"
   },
   "main": "./dist/core.js",
   "scripts": {
